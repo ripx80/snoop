@@ -1,3 +1,10 @@
+// Copyright - Copyleft 2019 Ripx80, All rights reserved.
+//
+// Use of this source code is governed by a BSD-style license
+// that can be found in the LICENSE file in the root of the source
+// tree.
+
+// Package snoop implements the snoop file format for gopacket
 package snoop
 
 import (
@@ -17,7 +24,6 @@ const defaultBufLen uint32 = 150
 const maxCaptureLen int = 4096
 
 // Errors
-
 const unknownMagic = "Unknown Snoop Magic Bytes"
 const unknownVersion = "Unknown Snoop Format Version"
 const unkownLinkType = "Unknown Link Type"
