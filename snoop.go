@@ -11,33 +11,40 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-const SnoopMagic uint64 = 0x706f6f6e73 //000000 //8 byte in big endian
+const snoopMagic uint64 = 0x706f6f6e73 //000000 //8 byte in big endian
 const snoopVersion uint32 = 2
-const DefaultBufLen uint32 = 150
-const MaxCaptureLen int = 4096
+const defaultBufLen uint32 = 150
+const maxCaptureLen int = 4096
 
 // Errors
 
-const UnknownMagic = "Unknown Snoop Magic Bytes"
-const UnknownVersion = "Unknown Snoop Format Version"
-const UnkownLinkType = "Unknown Link Type"
-const OriginalLenExceeded = "Capture length exceeds original packet length"
-const CaptureLenExceeded = "Capture length exceeds max capture length"
+const unknownMagic = "Unknown Snoop Magic Bytes"
+const unknownVersion = "Unknown Snoop Format Version"
+const unkownLinkType = "Unknown Link Type"
+const originalLenExceeded = "Capture length exceeds original packet length"
+const captureLenExceeded = "Capture length exceeds max capture length"
 
+// LinkTypes maps from snoop to gopacket layers
 type LinkTypes struct {
 	Code uint8
 	layers.LinkType
 }
 
-type SnoopHeader struct {
+type snoopHeader struct {
 	Magic    uint64
 	Version  uint32
 	linkType uint32
 }
 
+// Reader wraps an underlying io.Reader to read packet data in SNOOP
+// format.  See https://tools.ietf.org/html/rfc1761
+// for information on the file format.
+//
+// We currenty read v2 file format and convert microsecond to nanoseconds
+// byte order in big-endian encoding.
 type Reader struct {
 	r      io.Reader
-	header SnoopHeader
+	header snoopHeader
 	//reuseable
 	pad       int
 	packetBuf []byte
@@ -45,7 +52,7 @@ type Reader struct {
 }
 
 var (
-	LayerTypes = map[uint32]layers.LinkType{
+	layerTypes = map[uint32]layers.LinkType{
 		0: layers.LinkTypeEthernet,  // IEEE 802.3
 		2: layers.LinkTypeTokenRing, // IEEE 802.5 Token Ring
 		4: layers.LinkTypeEthernet,  // Ethernet
@@ -63,15 +70,20 @@ var (
 	}
 )
 
+// LinkType return the mapped gopacket LinkType
 func (r *Reader) LinkType() (*layers.LinkType, error) {
-	if _, ok := LayerTypes[r.header.linkType]; ok {
-		lt := LayerTypes[r.header.linkType]
+	if _, ok := layerTypes[r.header.linkType]; ok {
+		lt := layerTypes[r.header.linkType]
 		return &lt, nil
 	}
-	return nil, fmt.Errorf("%s, Code:%d", UnkownLinkType, r.header.linkType)
+	return nil, fmt.Errorf("%s, Code:%d", unkownLinkType, r.header.linkType)
 
 }
 
+// NewReader returns a new reader object, for reading packet data from
+// the given reader. The reader must be open and header data is
+// read from it at this point.
+// If the file format is not supported an error is returned
 func NewReader(r io.Reader) (*Reader, error) {
 	ret := Reader{r: r}
 
@@ -90,16 +102,16 @@ func (r *Reader) readHeader() error {
 		return errors.New("Not enough data for read")
 	}
 
-	if magic := binary.LittleEndian.Uint64(buf[0:8]); magic != SnoopMagic {
-		return fmt.Errorf("%s: %x", UnknownMagic, magic)
+	if magic := binary.LittleEndian.Uint64(buf[0:8]); magic != snoopMagic {
+		return fmt.Errorf("%s: %x", unknownMagic, magic)
 	}
 
 	if r.header.Version = binary.BigEndian.Uint32(buf[8:12]); r.header.Version != snoopVersion {
-		return fmt.Errorf("%s: %d", UnknownVersion, r.header.Version)
+		return fmt.Errorf("%s: %d", unknownVersion, r.header.Version)
 	}
 
 	if r.header.linkType = binary.BigEndian.Uint32(buf[12:16]); r.header.linkType > 10 {
-		return fmt.Errorf("%s, Code:%d", UnkownLinkType, r.header.linkType)
+		return fmt.Errorf("%s, Code:%d", unkownLinkType, r.header.linkType)
 	}
 	return nil
 }
@@ -122,17 +134,18 @@ func (r *Reader) readPacketHeader() (ci gopacket.CaptureInfo, err error) {
 	r.pad = int(binary.BigEndian.Uint32(r.buf[8:12])) - (24 + ci.Length)
 
 	if ci.CaptureLength > ci.Length {
-		err = errors.New(OriginalLenExceeded)
+		err = errors.New(originalLenExceeded)
 		return
 	}
 
-	if ci.CaptureLength > MaxCaptureLen {
-		err = errors.New(CaptureLenExceeded)
+	if ci.CaptureLength > maxCaptureLen {
+		err = errors.New(captureLenExceeded)
 	}
 
 	return
 }
 
+// ReadPacketData reads next packet data.
 func (r *Reader) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
 	if ci, err = r.readPacketHeader(); err != nil {
 		return
@@ -143,6 +156,11 @@ func (r *Reader) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err err
 
 }
 
+// ZeroCopyReadPacketData reads next packet data. The data buffer is owned by the Reader,
+// and each call to ZeroCopyReadPacketData invalidates data returned by the previous one.
+//
+// It is not true zero copy, as data is still copied from the underlying reader. However,
+// this method avoids allocating heap memory for every packet.
 func (r *Reader) ZeroCopyReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
 	if ci, err = r.readPacketHeader(); err != nil {
 		return

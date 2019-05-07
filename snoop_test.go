@@ -10,13 +10,13 @@ import (
 )
 
 var (
-	snoopHeader []byte = []byte{
+	spHeader = []byte{
 		0x73, 0x6E, 0x6F, 0x6F, 0x70, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x02,
 		0x00, 0x00, 0x00, 0x04,
 	}
 
-	pack []byte = []byte{
+	pack = []byte{
 		0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x44, 0x00, 0x00, 0x00, 0x00, 0x5C, 0xBE, 0xB8, 0x4C, 0x00, 0x0C, 0xB1, 0x47,
 		0x7c, 0x5a, 0x1c, 0x49, 0x3c, 0xd1, 0x1e, 0x65, 0x50, 0x7f, 0xb9, 0xca, 0x08, 0x06, 0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x1e, 0x65,
 		0x50, 0x7f, 0xb9, 0xca, 0x0a, 0x00, 0x33, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x33, 0x01, 0x00, 0x00,
@@ -24,32 +24,32 @@ var (
 )
 
 func OpenHandlePack() (buf []byte, handle *Reader, err error) {
-	buf = make([]byte, len(snoopHeader)+len(pack))
-	copy(buf, append(snoopHeader, pack...))
+	buf = make([]byte, len(spHeader)+len(pack))
+	copy(buf, append(spHeader, pack...))
 	handle, err = NewReader(bytes.NewReader(buf))
 	return buf, handle, err
 }
 
 func TestReadHeader(t *testing.T) {
-	_, err := NewReader(bytes.NewReader(snoopHeader))
+	_, err := NewReader(bytes.NewReader(spHeader))
 	assert.Nil(t, err)
 }
 
 func TestBadHeader(t *testing.T) {
-	buf := make([]byte, len(snoopHeader))
-	copy(buf, snoopHeader)
+	buf := make([]byte, len(spHeader))
+	copy(buf, spHeader)
 	buf[6] = 0xff //change buf?
 	_, err := NewReader(bytes.NewReader(buf))
-	assert.EqualError(t, err, fmt.Sprintf("%s: %s", UnknownMagic, "ff00706f6f6e73"))
+	assert.EqualError(t, err, fmt.Sprintf("%s: %s", unknownMagic, "ff00706f6f6e73"))
 	buf[6] = 0x00
 	buf[11] = 0x03
 	_, err = NewReader(bytes.NewReader(buf))
-	assert.EqualError(t, err, fmt.Sprintf("%s: %d", UnknownVersion, 3))
+	assert.EqualError(t, err, fmt.Sprintf("%s: %d", unknownVersion, 3))
 	buf[11] = 0x02
 
 	buf[15] = 0x0b // linktype 11 is undefined
 	_, err = NewReader(bytes.NewReader(buf))
-	assert.EqualError(t, err, fmt.Sprintf("%s, Code:%d", UnkownLinkType, 11))
+	assert.EqualError(t, err, fmt.Sprintf("%s, Code:%d", unkownLinkType, 11))
 	buf[15] = 0x04
 }
 
@@ -91,7 +91,7 @@ func TestBadPacketHeader(t *testing.T) {
 	assert.Nil(t, err)
 	buf[23] = 0x2C
 	_, _, err = handle.ReadPacketData()
-	assert.EqualError(t, err, OriginalLenExceeded)
+	assert.EqualError(t, err, originalLenExceeded)
 	buf[23] = 0x2A
 }
 
@@ -105,7 +105,7 @@ func TestBigPacketData(t *testing.T) {
 	buf[23] = 0x00
 	buf[22] = 0x11
 	_, _, err = handle.ReadPacketData()
-	assert.EqualError(t, err, CaptureLenExceeded)
+	assert.EqualError(t, err, captureLenExceeded)
 	buf[23] = 0x44
 	buf[22] = 0x00
 	buf[19] = 0x44
@@ -120,8 +120,8 @@ func TestLinkType(t *testing.T) {
 }
 
 func TestNotOverlapBuf(t *testing.T) {
-	buf := make([]byte, len(snoopHeader)+len(pack)*2)
-	packs := append(snoopHeader, pack...)
+	buf := make([]byte, len(spHeader)+len(pack)*2)
+	packs := append(spHeader, pack...)
 	copy(buf, append(packs, pack...))
 	handle, err := NewReader(bytes.NewReader(buf))
 	assert.Nil(t, err)
@@ -133,8 +133,8 @@ func TestNotOverlapBuf(t *testing.T) {
 }
 
 func GeneratePacks(num int) []byte {
-	buf := make([]byte, len(snoopHeader)+(len(pack)*num))
-	packs := append(snoopHeader, pack...)
+	buf := make([]byte, len(spHeader)+(len(pack)*num))
+	packs := append(spHeader, pack...)
 	for i := 1; i < num; i++ {
 		packs = append(packs, pack...)
 	}
