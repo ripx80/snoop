@@ -1,5 +1,7 @@
 # Go Snoop
 
+**This project is now merged into the google/gopacket project. Updates will be done there**
+
 A libary for read snoop file format v2 with gopacket integration.
 See readsnoop for example usage.
 
