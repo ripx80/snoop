@@ -5,6 +5,8 @@
 A libary for read snoop file format v2 with gopacket integration.
 See readsnoop for example usage.
 
+**Merged into gopacket! This repo is outdated**
+
 ## Header
 
 Here some Header informations of this format. For details see rfc1761.
